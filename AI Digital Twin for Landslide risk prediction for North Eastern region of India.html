@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Landslide Digital Twin — North Eastern India</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg: #0C1310;
+  --bg-panel: #121C17;
+  --bg-panel-2: #16211B;
+  --bg-raised: #1B2721;
+  --line: #253630;
+  --line-soft: #1C2822;
+  --text: #E9EFE9;
+  --text-muted: #93A69B;
+  --text-dim: #5E7268;
+  --water: #4FA3B8;
+  --road: #C7B37E;
+  --risk-verylow: #3A8F5E;
+  --risk-low: #6BAE6E;
+  --risk-moderate: #D6A83B;
+  --risk-high: #E0812F;
+  --risk-critical: #C23A2E;
+  --focus: #7CC6A6;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{ background:var(--bg); color:var(--text); font-family:'Space Grotesk','Segoe UI',sans-serif; min-height:100vh; }
+.mono{ font-family:'IBM Plex Mono',monospace; }
+button{ font-family:inherit; }
+::selection{ background:var(--focus); color:#0C1310; }
+:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+.app{ max-width:1400px; margin:0 auto; padding:20px 20px 50px; }
+
+.header{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:18px; }
+.header-left h1{ font-size:24px; font-weight:600; margin:0 0 4px; letter-spacing:-0.01em; }
+.header-left .sub{ color:var(--text-muted); font-size:13.5px; margin:0; }
+.header-left .sim-note{ display:inline-flex; align-items:center; gap:6px; margin-top:9px; padding:5px 10px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:5px; font-size:11.5px; color:var(--text-dim); max-width:640px; line-height:1.5; }
+.header-left .sim-note .dot{ width:6px; height:6px; border-radius:50%; background:var(--water); flex:none; margin-top:5px; }
+.status-pill{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.status-badge{ display:flex; align-items:center; gap:9px; padding:9px 15px; border-radius:6px; border:1px solid var(--line); background:var(--bg-panel-2); font-size:13px; font-weight:500; }
+.status-badge .led{ width:9px; height:9px; border-radius:50%; box-shadow:0 0 8px currentColor; background:currentColor; }
+.status-badge.normal{ color:var(--risk-verylow); }
+.status-badge.watch{ color:var(--risk-moderate); }
+.status-badge.warning{ color:var(--risk-high); }
+.status-badge.critical{ color:var(--risk-critical); }
+.status-caption{ font-size:11px; color:var(--text-dim); }
+
+.layout{ display:grid; grid-template-columns:230px minmax(0,1fr) 320px; gap:16px; align-items:start; }
+@media (max-width:1100px){ .layout{ grid-template-columns:1fr; } }
+
+.panel{ background:var(--bg-panel); border:1px solid var(--line); border-radius:8px; padding:15px; }
+.panel + .panel{ margin-top:16px; }
+.panel h2{ font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); font-weight:600; margin:0 0 12px; }
+
+.field{ margin-bottom:15px; }
+.field label{ display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+select{ width:100%; background:var(--bg-raised); color:var(--text); border:1px solid var(--line); border-radius:5px; padding:8px 9px; font-size:12.5px; font-family:inherit; cursor:pointer; }
+.rain-readout{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
+.rain-readout .val{ font-family:'IBM Plex Mono'; font-size:19px; font-weight:600; color:var(--water); }
+.rain-readout .unit{ font-size:11.5px; color:var(--text-dim); }
+input[type=range]{ width:100%; accent-color:var(--water); cursor:pointer; height:4px; margin:8px 0 4px; }
+.range-scale{ display:flex; justify-content:space-between; font-size:10px; color:var(--text-dim); }
+.reset-btn,.layer-btn{ width:100%; background:none; border:1px solid var(--line); color:var(--text-muted); border-radius:5px; padding:8px; font-size:12px; cursor:pointer; margin-top:4px; }
+.reset-btn:hover,.layer-btn:hover{ border-color:var(--text-muted); color:var(--text); }
+.layer-toggle{ display:flex; gap:6px; }
+.layer-toggle button{ flex:1; background:var(--bg-raised); border:1px solid var(--line); color:var(--text-muted); border-radius:5px; padding:7px 4px; font-size:11px; cursor:pointer; }
+.layer-toggle button.active{ border-color:var(--water); color:var(--water); background:var(--bg-panel-2); }
+
+.legend-row{ display:flex; align-items:center; gap:9px; font-size:12px; padding:3px 0; color:var(--text-muted); }
+.legend-swatch{ width:11px; height:11px; border-radius:50%; flex:none; border:1px solid #0C1310; }
+.icon-legend{ display:flex; flex-direction:column; gap:6px; margin-top:9px; padding-top:10px; border-top:1px solid var(--line-soft); }
+.icon-legend .row{ display:flex; align-items:center; gap:9px; font-size:11.5px; color:var(--text-dim); }
+
+.map-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; flex-wrap:wrap; gap:8px; }
+.map-toolbar .zone-name{ font-size:14.5px; font-weight:600; }
+.map-toolbar .zone-coords{ font-family:'IBM Plex Mono'; font-size:11px; color:var(--text-dim); }
+.map-wrap{ background:var(--bg-panel-2); border:1px solid var(--line-soft); border-radius:6px; padding:8px; position:relative; }
+#leafletMap{ width:100%; height:520px; border-radius:4px; background:#0C1310; }
+.map-hint{ margin-top:8px; font-size:11px; color:var(--text-dim); }
+
+.cell-strip{ display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-soft); }
+.cell-strip .stat{ min-width:82px; }
+.cell-strip .stat .k{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em; }
+.cell-strip .stat .v{ font-family:'IBM Plex Mono'; font-size:14.5px; margin-top:2px; }
+
+.score-card{ display:flex; align-items:center; gap:15px; }
+.score-ring{ position:relative; width:78px; height:78px; flex:none; }
+.score-ring svg{ width:100%; height:100%; transform:rotate(-90deg); }
+.score-ring .center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.score-ring .num{ font-family:'IBM Plex Mono'; font-size:21px; font-weight:600; }
+.score-ring .of100{ font-size:9px; color:var(--text-dim); margin-top:-2px; }
+.score-meta .cat{ font-size:15px; font-weight:600; margin-bottom:3px; }
+.score-meta .prob{ font-size:11.5px; color:var(--text-muted); font-family:'IBM Plex Mono'; }
+.score-meta .loc{ font-size:10.5px; color:var(--text-dim); margin-top:6px; font-family:'IBM Plex Mono'; }
+
+.explain-sentence{ font-size:12.5px; line-height:1.5; color:var(--text-muted); background:var(--bg-panel-2); border-left:2px solid var(--water); padding:10px 12px; border-radius:0 5px 5px 0; margin:12px 0 13px; }
+.contrib-row{ margin-bottom:9px; }
+.contrib-label{ display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:3px; }
+.contrib-label .name{ color:var(--text-muted); }
+.contrib-label .pct{ font-family:'IBM Plex Mono'; color:var(--text-dim); }
+.contrib-bar-bg{ height:6px; background:var(--bg-raised); border-radius:3px; overflow:hidden; }
+.contrib-bar-fill{ height:100%; border-radius:3px; }
+
+.infra-summary{ font-size:12.5px; color:var(--text-muted); margin-bottom:10px; line-height:1.5; }
+.infra-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
+.infra-list li{ display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:7px 9px; background:var(--bg-panel-2); border-radius:5px; border:1px solid var(--line-soft); }
+.infra-list li .tag{ font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dim); }
+
+.hist-card{ background:var(--bg-panel-2); border:1px solid var(--line-soft); border-radius:6px; padding:11px 12px; }
+.hist-card .sim{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+.hist-card .sim .pct{ font-family:'IBM Plex Mono'; font-size:17px; font-weight:600; color:var(--water); }
+.hist-card .sim .label{ font-size:10.5px; color:var(--text-dim); }
+.hist-card .desc{ font-size:12px; color:var(--text-muted); line-height:1.5; }
+.hist-card .desc b{ color:var(--text); font-weight:600; }
+
+.route-panel{ margin-top:16px; }
+.route-controls{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.route-controls .find-btn{ background:var(--water); color:#08151A; border:none; border-radius:6px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+.route-controls .find-btn:hover{ filter:brightness(1.08); }
+.route-controls .find-btn:disabled{ opacity:.4; cursor:not-allowed; }
+.checkbox-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted); }
+.checkbox-row input{ accent-color:var(--risk-critical); }
+.route-results{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+.route-stat{ background:var(--bg-panel-2); border:1px solid var(--line-soft); border-radius:6px; padding:10px 12px; }
+.route-stat .k{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em; }
+.route-stat .v{ font-family:'IBM Plex Mono'; font-size:15px; margin-top:3px; }
+.route-empty{ font-size:12px; color:var(--text-dim); }
+
+.footer-note{ margin-top:22px; font-size:11px; color:var(--text-dim); line-height:1.6; border-top:1px solid var(--line); padding-top:13px; }
+
+.contact-row{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:7px 9px; background:var(--bg-panel-2); border-radius:5px; border:1px solid var(--line-soft); margin-bottom:6px; font-size:12px; }
+.contact-row .lbl{ color:var(--text-muted); }
+.contact-row .unverified{ font-size:9.5px; color:var(--risk-moderate); display:block; margin-top:2px; }
+.contact-row a{ color:var(--water); white-space:nowrap; text-decoration:none; font-family:'IBM Plex Mono'; }
+.contact-row a:hover{ text-decoration:underline; }
+.state-contact-heading{ font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.04em; margin:10px 0 6px; }
+
+.alert-banner{ padding:10px 12px; border-radius:6px; background:rgba(194,58,46,0.12); border:1px solid var(--risk-critical); font-size:12.5px; color:var(--text); margin-bottom:4px; }
+.alert-banner .title{ font-weight:600; color:var(--risk-critical); margin-bottom:3px; }
+.alert-log-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 10px; background:var(--bg-panel-2); border-radius:5px; border:1px solid var(--line-soft); margin-bottom:6px; font-size:12px; }
+.alert-log-row .meta{ color:var(--text-dim); font-size:10.5px; font-family:'IBM Plex Mono'; }
+
+.leaflet-popup-content-wrapper{ background:var(--bg-panel-2); color:var(--text); border-radius:6px; }
+.leaflet-popup-tip{ background:var(--bg-panel-2); }
+.leaflet-container{ font-family:'Space Grotesk',sans-serif; }
+.pin-label{ font-family:'IBM Plex Mono'; font-size:10px; color:#F4F1E6; text-shadow:0 0 3px #000,0 0 3px #000; white-space:nowrap; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <div class="header-left">
+      <h1>AI Landslide Digital Twin — North Eastern Region</h1>
+      <p class="sub">Risk monitoring &amp; evacuation decision support across landslide-prone hill districts of NE India · SIH26001</p>
+      <div class="sim-note"><span class="dot"></span><span>Basemap is real satellite imagery (Esri World Imagery) and evacuation routes are computed on the real road network (OSRM). Per-site <b>risk scores</b> are a simplified illustrative model, not a live operational feed — calibrate against IMD / SDMA / GSI / NRSC data before real deployment.</span></div>
+    </div>
+    <div class="status-pill">
+      <div class="status-badge" id="statusBadge"><span class="led"></span><span id="statusText">Normal</span></div>
+      <div class="status-caption" id="statusCaption">Region-wide early-warning status</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="col-left">
+      <div class="panel">
+        <h2>Monitored site</h2>
+        <div class="field">
+          <label for="stateSelect">State</label>
+          <select id="stateSelect"></select>
+        </div>
+        <div class="field">
+          <label for="siteSelect">Hotspot / district town</label>
+          <select id="siteSelect"></select>
+        </div>
+        <div class="field" style="margin-bottom:4px;">
+          <div class="rain-readout"><span class="unit">24h rainfall (what-if)</span><span><span class="val" id="rainVal">120</span><span class="unit"> mm</span></span></div>
+          <input type="range" id="rainSlider" min="20" max="400" step="5" value="120">
+          <div class="range-scale"><span>20mm</span><span>400mm</span></div>
+        </div>
+        <button class="reset-btn" id="resetBtn">Reset to baseline (60 mm)</button>
+      </div>
+
+      <div class="panel">
+        <h2>Basemap</h2>
+        <div class="layer-toggle">
+          <button id="btnSat" class="active">Satellite</button>
+          <button id="btnDark">Dark map</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Risk legend</h2>
+        <div class="legend-row"><span class="legend-swatch" style="background:var(--risk-verylow)"></span>Very low (0–20)</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:var(--risk-low)"></span>Low (20–40)</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:var(--risk-moderate)"></span>Moderate (40–60)</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:var(--risk-high)"></span>High (60–80)</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:var(--risk-critical)"></span>Critical (80–100)</div>
+        <div class="icon-legend">
+          <div class="row">★ Shelter / relief centre</div>
+          <div class="row">● Monitored hotspot</div>
+          <div class="row">┅ Computed evacuation route (real roads)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-center">
+      <div class="panel">
+        <div class="map-toolbar">
+          <div><div class="zone-name" id="zoneName">—</div><div class="zone-coords" id="zoneCoords">—</div></div>
+        </div>
+        <div class="map-wrap"><div id="leafletMap"></div></div>
+        <div class="map-hint">Click any coloured marker to inspect its risk, drivers and nearby infrastructure. Pan/zoom the satellite view like a normal map.</div>
+        <div class="cell-strip" id="cellStrip"></div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="panel">
+        <h2>Risk score</h2>
+        <div class="score-card">
+          <div class="score-ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="#1B2721" stroke-width="10"/><circle id="scoreArc" cx="50" cy="50" r="42" fill="none" stroke="var(--risk-moderate)" stroke-width="10" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264"/></svg><div class="center"><span class="num" id="scoreNum">—</span><span class="of100">/ 100</span></div></div>
+          <div class="score-meta"><div class="cat" id="scoreCat">—</div><div class="prob" id="scoreProb">probability —</div><div class="loc" id="scoreLoc">no site selected</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Explainable AI</h2>
+        <div class="explain-sentence" id="explainSentence">Select a hotspot on the map to see why the model rates it this way.</div>
+        <div id="contribList"></div>
+      </div>
+      <div class="panel">
+        <h2>Infrastructure exposure</h2>
+        <div class="infra-summary" id="infraSummary">—</div>
+        <ul class="infra-list" id="infraList"></ul>
+      </div>
+      <div class="panel">
+        <h2>Historical context</h2>
+        <div class="hist-card"><div class="sim"><span class="pct" id="histPct">—</span><span class="label">similarity</span></div><div class="desc" id="histDesc">Select a site to compare current what-if conditions with a reference historical event.</div></div>
+      </div>
+      <div class="panel">
+        <h2>Emergency contacts</h2>
+        <div id="emergencyContactsList"></div>
+        <div class="map-hint" style="margin-top:8px;">Numbers marked <b>unverified</b> were the best on file at build time but not confirmed against an official source this session — call the department to confirm before relying on them.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel route-panel" id="alertPanel">
+    <h2>Automated alerts &amp; notifications (simulated)</h2>
+    <div class="sim-note" style="display:block; margin-bottom:12px;"><span class="dot"></span> No real SMS/push/email is sent from this standalone demo — this simulates what a connected backend (see <span class="mono">alertDispatchService.js</span>) would trigger whenever a site's score crosses <b>50/100</b>. Move the rainfall slider or switch sites to see it fire.</div>
+    <div id="alertBannerSelected"></div>
+    <div class="map-hint" style="margin:10px 0 6px;">Dispatch log (most recent first)</div>
+    <div id="alertLogList"><div class="route-empty">No site has crossed the alert threshold yet in this session.</div></div>
+  </div>
+
+  <div class="panel route-panel">
+    <h2>Evacuation route support (real road network)</h2>
+    <div class="route-controls">
+      <button class="find-btn" id="findRouteBtn">Find safest route to nearest shelter</button>
+      <span class="route-empty" id="routeHint">Uses the selected hotspot as the starting point.</span>
+    </div>
+    <div id="routeResults"><div class="route-empty">Select a hotspot on the map, then find a route.</div></div>
+  </div>
+
+  <div class="footer-note">
+    Coordinates are approximate town/district centres, not verified official monitoring stations. Risk scores are probabilistic outputs of a simplified illustrative model (rainfall, slope, soil moisture, vegetation loss, historical proximity) and are not a certified operational forecast. Satellite imagery © Esri and its data providers; road routing © OSRM/OpenStreetMap contributors. In deployment, thresholds, alerts and evacuation guidance must be calibrated and validated against real satellite (NRSC/Bhuvan), IMD, Geological Survey of India and State Disaster Management Authority data before use.
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   DETERMINISTIC "MODEL" HELPERS (illustrative only)
+============================================================ */
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function hashSeed(str){ let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; } return h; }
+const WEIGHTS = { rain:0.30, slope:0.25, soil:0.20, veg:0.15, hist:0.10 };
+
+/* ============================================================
+   HOTSPOTS: real approximate coordinates across NE hill districts
+============================================================ */
+const SITES = [
+  {id:'mangan', state:'Sikkim', name:'Mangan (North Sikkim)', lat:27.5183, lon:88.5325, historical:false},
+  {id:'chungthang', state:'Sikkim', name:'Chungthang', lat:27.6167, lon:88.6500, historical:true, event:{date:'Oct 2023', cause:'Glacial-lake outburst flood compounded by heavy monsoon rainfall on steep Teesta valley slopes', rainfall_mm:180, slope:37}},
+  {id:'gangtok', state:'Sikkim', name:'Gangtok', lat:27.3389, lon:88.6065, historical:true, event:{date:'Jun 2022', cause:'Heavy monsoon rainfall triggered a slope failure in the city that required an army rescue of people buried under debris', rainfall_mm:160, slope:33}},
+  {id:'sohra', state:'Meghalaya', name:'Sohra (Cherrapunji)', lat:25.2840, lon:91.7273, historical:true, event:{date:'Jun 2022', cause:'Cherrapunji recorded close to 1000 mm of rain in 24 hours — among the highest ever measured there — saturating steep slopes region-wide', rainfall_mm:220, slope:39}},
+  {id:'shillong', state:'Meghalaya', name:'Shillong', lat:25.5788, lon:91.8933, historical:false},
+  {id:'nongstoin', state:'Meghalaya', name:'Nongstoin (West Khasi Hills)', lat:25.5167, lon:91.2667, historical:false},
+  {id:'jowai', state:'Meghalaya', name:'Jowai (Jaintia Hills)', lat:25.4500, lon:92.2000, historical:false},
+  {id:'bomdila', state:'Arunachal Pradesh', name:'Bomdila (West Kameng)', lat:27.2646, lon:92.4159, historical:false},
+  {id:'tawang', state:'Arunachal Pradesh', name:'Tawang', lat:27.5859, lon:91.8697, historical:false},
+  {id:'yingkiong', state:'Arunachal Pradesh', name:'Yingkiong (Upper Siang)', lat:28.6500, lon:95.0333, historical:true, event:{date:'Recurring, most monsoons', cause:'Young, seismically active Himalayan slopes combined with intense monsoon rainfall repeatedly cut off roads around Yingkiong, Migging and Tuting', rainfall_mm:195, slope:41}},
+  {id:'along', state:'Arunachal Pradesh', name:'Along / Aalo (West Siang)', lat:28.1667, lon:94.8000, historical:false},
+  {id:'haflong', state:'Assam', name:'Haflong (Dima Hasao)', lat:25.1667, lon:93.0167, historical:true, event:{date:'Recurring monsoons', cause:'Fragile, heavily weathered hill slopes with repeated rail and road cutting failures', rainfall_mm:150, slope:30}},
+  {id:'diphu', state:'Assam', name:'Diphu (Karbi Anglong)', lat:25.8443, lon:93.4293, historical:false},
+  {id:'kohima', state:'Nagaland', name:'Kohima', lat:25.6751, lon:94.1086, historical:false},
+  {id:'phek', state:'Nagaland', name:'Phek', lat:25.6667, lon:94.4833, historical:false},
+  {id:'ukhrul', state:'Manipur', name:'Ukhrul', lat:25.1167, lon:94.3667, historical:false},
+  {id:'senapati', state:'Manipur', name:'Senapati', lat:25.2667, lon:94.0167, historical:false},
+  {id:'noney', state:'Manipur', name:'Noney', lat:24.8333, lon:93.7667, historical:true, event:{date:'Jun 2022', cause:'Slope failure at a hillside construction/railway worksite following heavy rainfall', rainfall_mm:170, slope:34}},
+  {id:'aizawl', state:'Mizoram', name:'Aizawl', lat:23.7271, lon:92.7176, historical:true, event:{date:'May 2024', cause:'Cyclone Remal brought extreme rainfall that collapsed a stone quarry and triggered multiple slope failures on the city’s ridgeline terrain, killing dozens', rainfall_mm:210, slope:37}},
+  {id:'champhai', state:'Mizoram', name:'Champhai', lat:23.4667, lon:93.3333, historical:false},
+  {id:'lunglei', state:'Mizoram', name:'Lunglei', lat:22.8833, lon:92.7333, historical:false},
+  {id:'jampui', state:'Tripura', name:'Jampui Hills (Dhalai)', lat:24.1667, lon:92.2833, historical:false}
+];
+
+const SHELTERS = [
+  {id:'sh_gangtok', name:'Gangtok Relief Coordination Centre', lat:27.3314, lon:88.6138},
+  {id:'sh_shillong', name:'Shillong Relief Coordination Centre', lat:25.5744, lon:91.8825},
+  {id:'sh_itanagar', name:'Itanagar Relief Coordination Centre', lat:27.0844, lon:93.6053},
+  {id:'sh_silchar', name:'Silchar Relief Coordination Centre', lat:24.8333, lon:92.7789},
+  {id:'sh_kohima', name:'Kohima Relief Coordination Centre', lat:25.6701, lon:94.1077},
+  {id:'sh_imphal', name:'Imphal Relief Coordination Centre', lat:24.8170, lon:93.9368},
+  {id:'sh_aizawl', name:'Aizawl Relief Coordination Centre', lat:23.7307, lon:92.7173},
+  {id:'sh_agartala', name:'Agartala Relief Coordination Centre', lat:23.8315, lon:91.2868}
+];
+
+// illustrative infrastructure per site (population figures are placeholders for demo)
+const INFRA = {
+  mangan:[{type:'settlement',name:'Mangan Bazaar',population:3200}],
+  chungthang:[{type:'settlement',name:'Chungthang Township',population:2600},{type:'bridge',name:'Teesta road bridge'}],
+  sohra:[{type:'school',name:'Sohra Govt. School'},{type:'settlement',name:'Sohra Market',population:4100}],
+  yingkiong:[{type:'hospital',name:'Yingkiong District Hospital'},{type:'settlement',name:'Yingkiong Town',population:5200}],
+  haflong:[{type:'settlement',name:'Haflong Town',population:9800},{type:'bridge',name:'NH-27 hill cutting'}],
+  noney:[{type:'settlement',name:'Noney Worksite Camp',population:600}],
+  aizawl:[{type:'hospital',name:'Aizawl Civil Hospital'},{type:'school',name:'Aizawl Govt. School'},{type:'settlement',name:'Aizawl City Ward',population:15000}],
+  along:[{type:'settlement',name:'Along Town',population:4700}],
+  jowai:[{type:'settlement',name:'Jowai Town',population:3900}],
+  ukhrul:[{type:'settlement',name:'Ukhrul Town',population:3500}]
+};
+
+/* ============================================================
+   EMERGENCY CONTACTS — verified against official sources where noted;
+   "verified:false" numbers are the best on file but not independently
+   confirmed against an official source this session (see the footer note).
+============================================================ */
+const NATIONAL_CONTACTS = [
+  {label:'Unified Emergency (Police / Fire / Ambulance / Disaster)', phone:'112', verified:true},
+  {label:'Police', phone:'100', verified:true},
+  {label:'Fire', phone:'101', verified:true},
+  {label:'Ambulance / Medical', phone:'102 (108 in Assam & Meghalaya)', verified:true},
+  {label:'National Disaster Response Force (NDRF) HQ', phone:'011-24363260', verified:true},
+  {label:'Women Helpline', phone:'1091', verified:true}
+];
+const STATE_CONTACTS = {
+  'Sikkim': [{label:'Sikkim SDMA — Control Room', phone:'03592-201145 / 03592-202461', verified:true}],
+  'Arunachal Pradesh': [{label:'Arunachal Pradesh SDMA', phone:'09436074396 / 08257891310 / 03603510046', verified:true}],
+  'Tripura': [
+    {label:'State Control Room (toll-free)', phone:'1070', verified:true},
+    {label:'District Control Room (toll-free)', phone:'1077', verified:true}
+  ],
+  'Assam': [{label:'Assam SDMA (asdma.assam.gov.in)', phone:'contact via website — not independently verified', verified:false}],
+  'Meghalaya': [{label:'Meghalaya SDMA (Revenue & DM Dept.)', phone:'0364-2503022', verified:false}],
+  'Manipur': [{label:'Manipur SDMA (manipur.gov.in)', phone:'contact via website — not independently verified', verified:false}],
+  'Mizoram': [{label:'Dept. of Disaster Mgmt. & Rehabilitation', phone:'0389-2322411 / 0389-2322429', verified:false}],
+  'Nagaland': [{label:'Nagaland SDMA', phone:'0370-2270938 / 0370-2270050', verified:false}]
+};
+const ALERT_THRESHOLD = 50;
+
+function siteSeedValues(site){
+  const rng = mulberry32(hashSeed(site.id));
+  const slopeBase = site.event ? site.event.slope : clamp(14+rng()*30,10,55);
+  const vegetation = clamp(0.75 - rng()*0.5, 0.08, 0.85);
+  const soilBase = clamp(20 + rng()*35, 12, 70);
+  return { slope: Math.round(slopeBase), vegetation: +vegetation.toFixed(2), soilBase: Math.round(soilBase) };
+}
+
+function computeRisk(site, rainfall24h){
+  const seed = siteSeedValues(site);
+  const rainfallSite = clamp(rainfall24h*(0.85+((seed.slope/55))*0.3), 0, 450);
+  const soilMoisture = clamp(seed.soilBase + (rainfallSite/320)*48 - 8, 5, 100);
+  const rainNorm = clamp(rainfallSite/300,0,1);
+  const slopeNorm = clamp(seed.slope/55,0,1);
+  const soilNorm = clamp(soilMoisture/100,0,1);
+  const vegLossNorm = clamp(1-seed.vegetation,0,1);
+  const histTerm = site.historical ? 1 : 0;
+  const contributions = [
+    {key:'rain',label:'Cumulative rainfall',raw:rainNorm,value:WEIGHTS.rain*rainNorm},
+    {key:'slope',label:'Slope steepness',raw:slopeNorm,value:WEIGHTS.slope*slopeNorm},
+    {key:'soil',label:'Soil moisture',raw:soilNorm,value:WEIGHTS.soil*soilNorm},
+    {key:'veg',label:'Vegetation loss',raw:vegLossNorm,value:WEIGHTS.veg*vegLossNorm},
+    {key:'hist',label:'Historical landslide proximity',raw:histTerm,value:WEIGHTS.hist*histTerm}
+  ];
+  const probability = clamp(contributions.reduce((s,c)=>s+c.value,0),0,1);
+  const score = Math.round(probability*100);
+  let category,key2;
+  if(score<20){category='Very Low';key2='verylow';}
+  else if(score<40){category='Low';key2='low';}
+  else if(score<60){category='Moderate';key2='moderate';}
+  else if(score<80){category='High';key2='high';}
+  else {category='Critical';key2='critical';}
+  contributions.sort((a,b)=>b.value-a.value);
+  return { probability, score, category, key:key2, rainfallSite:Math.round(rainfallSite), soilMoisture:Math.round(soilMoisture), slope:seed.slope, vegetation:seed.vegetation, contributions };
+}
+
+function warningStateFor(category){
+  if(category==='Very Low'||category==='Low') return 'Normal';
+  if(category==='Moderate') return 'Watch';
+  if(category==='High') return 'Warning';
+  return 'Critical';
+}
+
+const CATCOLOR = { verylow:'#3A8F5E', low:'#6BAE6E', moderate:'#D6A83B', high:'#E0812F', critical:'#C23A2E' };
+
+/* ============================================================
+   STATE
+============================================================ */
+const state = { rainfall:120, selectedId: SITES[0].id, map:null, markers:{}, shelterMarkers:[], routeLine:null, satLayer:null, darkLayer:null, alertLog:[], aboveThreshold:{} };
+
+function selectedSite(){ return SITES.find(s=>s.id===state.selectedId); }
+
+/* ============================================================
+   MAP INIT
+============================================================ */
+function initMap(){
+  const map = L.map('leafletMap', { zoomControl:true, attributionControl:true }).setView([25.6,93.5], 6);
+  state.satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom:17, attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
+  });
+  state.darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom:19, attribution:'&copy; OpenStreetMap contributors &copy; CARTO'
+  });
+  state.satLayer.addTo(map);
+  state.map = map;
+
+  SITES.forEach(site=>{
+    const marker = L.circleMarker([site.lat,site.lon], { radius:8, weight:2, color:'#0C1310', fillOpacity:0.95 })
+      .addTo(map)
+      .bindTooltip(site.name, {permanent:false, direction:'top'})
+      .on('click', ()=>{ state.selectedId = site.id; state.route=null; document.getElementById('siteSelect').value = site.id; renderAll(); });
+    state.markers[site.id] = marker;
+  });
+
+  SHELTERS.forEach(sh=>{
+    const star = L.marker([sh.lat,sh.lon], {
+      icon: L.divIcon({ className:'', html:'<div style="font-size:18px;color:#F4E27A;text-shadow:0 0 3px #000;">★</div>', iconSize:[20,20], iconAnchor:[10,10] })
+    }).addTo(map).bindTooltip(sh.name, {direction:'top'});
+    state.shelterMarkers.push(star);
+  });
+}
+
+function refreshMarkerColors(){
+  SITES.forEach(site=>{
+    const rr = computeRisk(site, state.rainfall);
+    const marker = state.markers[site.id];
+    marker.setStyle({ fillColor: CATCOLOR[rr.key] });
+    if(site.id===state.selectedId){
+      marker.setStyle({ color:'#F4F1E6', weight:3, radius:10 });
+    } else {
+      marker.setStyle({ color:'#0C1310', weight:2, radius:8 });
+    }
+  });
+}
+
+/* ============================================================
+   RENDER: status / zone info
+============================================================ */
+function regionWideStatus(){
+  const order=['Normal','Watch','Warning','Critical'];
+  let worst='Normal';
+  SITES.forEach(site=>{
+    const st = warningStateFor(computeRisk(site,state.rainfall).category);
+    if(order.indexOf(st)>order.indexOf(worst)) worst=st;
+  });
+  return worst;
+}
+function renderStatus(){
+  const st = regionWideStatus();
+  const badge = document.getElementById('statusBadge');
+  badge.className = 'status-badge '+st.toLowerCase();
+  document.getElementById('statusText').textContent = st;
+  const caps={ Normal:'No monitored site above moderate risk — routine monitoring.', Watch:'Some sites at moderate risk — increase monitoring frequency.', Warning:'High-risk sites detected — prepare field teams and review evacuation routes.', Critical:'Critical risk sites present — urgent assessment per official protocol.' };
+  document.getElementById('statusCaption').textContent = caps[st];
+}
+function renderZoneInfo(){
+  const site = selectedSite();
+  document.getElementById('zoneName').textContent = site.name+' · '+site.state;
+  document.getElementById('zoneCoords').textContent = `${site.lat.toFixed(4)}°N, ${site.lon.toFixed(4)}°E`;
+}
+
+/* ============================================================
+   RENDER: cell strip / score / explain / infra / historical
+============================================================ */
+function renderCellStrip(){
+  const site = selectedSite(); const rr = computeRisk(site,state.rainfall);
+  const items=[['Slope',rr.slope+'°'],['Rainfall (24h)',rr.rainfallSite+' mm'],['Soil moisture',rr.soilMoisture+'%'],['Vegetation cover',Math.round(rr.vegetation*100)+'%'],['Past landslide here',site.historical?'Yes':'No']];
+  document.getElementById('cellStrip').innerHTML = items.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+}
+function renderScoreAndExplain(){
+  const site = selectedSite(); const rr = computeRisk(site,state.rainfall);
+  document.getElementById('scoreNum').textContent = rr.score;
+  document.getElementById('scoreCat').textContent = rr.category;
+  document.getElementById('scoreCat').style.color = CATCOLOR[rr.key];
+  document.getElementById('scoreProb').textContent = 'probability '+(rr.probability*100).toFixed(1)+'%';
+  document.getElementById('scoreLoc').textContent = site.name+', '+site.state;
+  const circumference = 2*Math.PI*42;
+  const arc = document.getElementById('scoreArc');
+  arc.setAttribute('stroke-dasharray', circumference.toFixed(1));
+  arc.setAttribute('stroke-dashoffset', (circumference*(1-rr.probability)).toFixed(1));
+  arc.setAttribute('stroke', CATCOLOR[rr.key]);
+  const top3 = rr.contributions.slice(0,3).map(c=>c.label.toLowerCase());
+  document.getElementById('explainSentence').textContent = `Risk is ${rr.category.toLowerCase()} primarily because of ${top3[0]}, ${top3[1]} and ${top3[2]}.`;
+  document.getElementById('contribList').innerHTML = rr.contributions.map(c=>{
+    const pct = Math.round((c.value/(rr.probability||0.0001))*100);
+    return `<div class="contrib-row"><div class="contrib-label"><span class="name">${c.label}</span><span class="pct">${isFinite(pct)?pct:0}%</span></div><div class="contrib-bar-bg"><div class="contrib-bar-fill" style="width:${Math.round(c.raw*100)}%; background:${CATCOLOR[rr.key]}"></div></div></div>`;
+  }).join('');
+}
+function renderInfra(){
+  const site = selectedSite(); const rr = computeRisk(site,state.rainfall);
+  const nearby = INFRA[site.id] || [];
+  const summary = document.getElementById('infraSummary');
+  if(rr.category==='High'||rr.category==='Critical'){
+    summary.textContent = nearby.length ? `${rr.category} risk site: ${nearby.length} mapped asset${nearby.length>1?'s':''} potentially exposed nearby.` : `${rr.category} risk site: no mapped infrastructure on file for this hotspot yet.`;
+  } else {
+    summary.textContent = `${rr.category} risk here — infrastructure exposure is not a priority at this site right now.`;
+  }
+  const listEl = document.getElementById('infraList');
+  listEl.innerHTML = nearby.length ? nearby.map(n=>`<li><span>${n.name}${n.population?` · pop. ~${n.population}`:''}</span><span class="tag">${n.type}</span></li>`).join('') : '<li style="justify-content:center;color:var(--text-dim);">No infrastructure on file within this demo dataset</li>';
+}
+function renderHistorical(){
+  const site = selectedSite(); const rr = computeRisk(site,state.rainfall);
+  if(site.event){
+    const d = Math.sqrt(Math.pow((rr.rainfallSite-site.event.rainfall_mm)/200,2)+Math.pow((rr.slope-site.event.slope)/40,2));
+    const similarity = clamp(100*(1-d/1.4),5,99);
+    document.getElementById('histPct').textContent = Math.round(similarity)+'%';
+    document.getElementById('histDesc').innerHTML = `Reference event at ${site.name} (${site.event.date}): ${site.event.cause}. Reported/estimated conditions: ~${site.event.rainfall_mm} mm rainfall, ~${site.event.slope}° slope. Shown as similarity context, not a guarantee of recurrence.`;
+  } else {
+    document.getElementById('histPct').textContent = '—';
+    document.getElementById('histDesc').textContent = `No documented reference landslide event is attached to ${site.name} in this demo dataset. Nearby hill districts have recorded monsoon-triggered slope failures historically — treat this site's score as model-only until validated.`;
+  }
+}
+
+/* ============================================================
+   EMERGENCY CONTACTS
+============================================================ */
+function contactRowHtml(c){
+  return `<div class="contact-row">
+    <div><span class="lbl">${c.label}</span>${c.verified?'':'<span class="unverified">unverified — confirm before use</span>'}</div>
+    <a href="tel:${c.phone.replace(/[^0-9]/g,'')}">${c.phone}</a>
+  </div>`;
+}
+function renderEmergencyContacts(){
+  const site = selectedSite();
+  let html = NATIONAL_CONTACTS.map(contactRowHtml).join('');
+  const stateContacts = STATE_CONTACTS[site.state] || [];
+  if(stateContacts.length){
+    html += `<div class="state-contact-heading">${site.state}</div>` + stateContacts.map(contactRowHtml).join('');
+  }
+  document.getElementById('emergencyContactsList').innerHTML = html;
+}
+
+/* ============================================================
+   AUTO-ALERT DISPATCH (simulated — no real message is sent)
+============================================================ */
+function estimatePopulation(site){
+  const infra = INFRA[site.id];
+  if(!infra) return null;
+  const total = infra.reduce((s,i)=> s + (i.population||0), 0);
+  return total || null;
+}
+
+function updateAlertsAndNotifications(){
+  // Edge-triggered: log a new "dispatch" only the moment a site crosses
+  // above the threshold, not on every re-render, so nudging the slider
+  // repeatedly doesn't spam the log (mirrors the backend's cooldown logic).
+  SITES.forEach(site=>{
+    const rr = computeRisk(site, state.rainfall);
+    const wasAbove = !!state.aboveThreshold[site.id];
+    const isAbove = rr.score > ALERT_THRESHOLD;
+    if(isAbove && !wasAbove){
+      const pop = estimatePopulation(site);
+      state.alertLog.unshift({
+        time: new Date(),
+        site, score: rr.score, category: rr.category,
+        recipients: pop ? `~${pop.toLocaleString('en-IN')} residents (mapped settlements)` : 'no population figure on file for this site'
+      });
+      if(state.alertLog.length > 30) state.alertLog.length = 30;
+    }
+    state.aboveThreshold[site.id] = isAbove;
+  });
+
+  // Banner for the currently-selected site
+  const site = selectedSite();
+  const rr = computeRisk(site, state.rainfall);
+  const bannerEl = document.getElementById('alertBannerSelected');
+  if(rr.score > ALERT_THRESHOLD){
+    const pop = estimatePopulation(site);
+    bannerEl.innerHTML = `<div class="alert-banner">
+      <div class="title">⚠ ${site.name} is above the alert threshold (${ALERT_THRESHOLD}/100)</div>
+      Simulated dispatch: SMS + push + email would be sent now to ${pop ? `~${pop.toLocaleString('en-IN')} residents in mapped settlements` : 'residents registered for this area'}, plus an escalation flag to the ${site.state} disaster-management control room listed below.
+    </div>`;
+  } else {
+    bannerEl.innerHTML = `<div class="map-hint">${site.name} is currently below the alert threshold (score ${rr.score}/100) — no dispatch triggered.</div>`;
+  }
+
+  // Dispatch log
+  const logEl = document.getElementById('alertLogList');
+  if(!state.alertLog.length){
+    logEl.innerHTML = '<div class="route-empty">No site has crossed the alert threshold yet in this session.</div>';
+  } else {
+    logEl.innerHTML = state.alertLog.map(entry => `
+      <div class="alert-log-row">
+        <div><b>${entry.site.name}</b>, ${entry.site.state} — ${entry.category} (${entry.score}/100)<br><span class="meta">${entry.recipients}</span></div>
+        <span class="meta">${entry.time.toLocaleTimeString()}</span>
+      </div>`).join('');
+  }
+}
+
+/* ============================================================
+   ROUTING (real roads via OSRM public demo server)
+============================================================ */
+function nearestShelter(from){
+  let best=null,bd=Infinity;
+  SHELTERS.forEach(sh=>{
+    const d = Math.pow(sh.lat-from.lat,2)+Math.pow(sh.lon-from.lon,2);
+    if(d<bd){ bd=d; best=sh; }
+  });
+  return best;
+}
+
+function clearRoute(){
+  if(state.routeLine){ state.map.removeLayer(state.routeLine); state.routeLine=null; }
+}
+
+async function runFindRoute(){
+  const site = selectedSite();
+  const shelter = nearestShelter(site);
+  const results = document.getElementById('routeResults');
+  results.innerHTML = '<div class="route-empty">Calculating route on the real road network…</div>';
+  clearRoute();
+  const url = `https://router.project-osrm.org/route/v1/driving/${site.lon},${site.lat};${shelter.lon},${shelter.lat}?overview=full&geometries=geojson`;
+  try{
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if(!data.routes || !data.routes.length){ throw new Error('no route'); }
+    const route = data.routes[0];
+    const coords = route.geometry.coordinates.map(c=>[c[1],c[0]]);
+    state.routeLine = L.polyline(coords, { color:'#F4F1E6', weight:4, dashArray:'8,6' }).addTo(state.map);
+    state.map.fitBounds(state.routeLine.getBounds(), { padding:[30,30] });
+    const distKm = (route.distance/1000).toFixed(1);
+    const durMin = Math.round(route.duration/60);
+    const rr = computeRisk(site, state.rainfall);
+    results.innerHTML = `
+      <div class="route-results">
+        <div class="route-stat"><div class="k">Destination</div><div class="v" style="font-size:13px;">${shelter.name}</div></div>
+        <div class="route-stat"><div class="k">Road distance</div><div class="v">${distKm} km</div></div>
+        <div class="route-stat"><div class="k">Est. drive time</div><div class="v">${durMin} min</div></div>
+        <div class="route-stat"><div class="k">Origin risk now</div><div class="v" style="color:${CATCOLOR[rr.key]}">${rr.category} (${rr.score}/100)</div></div>
+      </div>`;
+  } catch(err){
+    const dLat=(shelter.lat-site.lat), dLon=(shelter.lon-site.lon);
+    const straightKm = (Math.sqrt(dLat*dLat+dLon*dLon)*111).toFixed(0);
+    state.routeLine = L.polyline([[site.lat,site.lon],[shelter.lat,shelter.lon]], { color:'#F4F1E6', weight:3, dashArray:'3,7', opacity:0.7 }).addTo(state.map);
+    state.map.fitBounds(state.routeLine.getBounds(), { padding:[30,30] });
+    results.innerHTML = `<div class="route-empty">Live routing service did not return a road route for this remote stretch (common for sparsely-mapped hill roads). Showing straight-line distance (~${straightKm} km) to <b>${shelter.name}</b> as a fallback — verify the actual road path with local authorities.</div>`;
+  }
+}
+
+/* ============================================================
+   WIRE UP
+============================================================ */
+function populateSelectors(){
+  const stateSelect = document.getElementById('stateSelect');
+  const states = [...new Set(SITES.map(s=>s.state))];
+  states.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=st; stateSelect.appendChild(o); });
+  stateSelect.value = selectedSite().state;
+
+  function refreshSiteOptions(){
+    const siteSelect = document.getElementById('siteSelect');
+    siteSelect.innerHTML='';
+    SITES.filter(s=>s.state===stateSelect.value).forEach(s=>{
+      const o=document.createElement('option'); o.value=s.id; o.textContent=s.name; siteSelect.appendChild(o);
+    });
+    siteSelect.value = state.selectedId && SITES.find(s=>s.id===state.selectedId).state===stateSelect.value ? state.selectedId : siteSelect.options[0].value;
+  }
+  refreshSiteOptions();
+
+  stateSelect.addEventListener('change', ()=>{ refreshSiteOptions(); state.selectedId = document.getElementById('siteSelect').value; state.route=null; clearRoute(); focusSite(); renderAll(); });
+  document.getElementById('siteSelect').addEventListener('change', (e)=>{ state.selectedId = e.target.value; state.route=null; clearRoute(); focusSite(); renderAll(); });
+}
+
+function focusSite(){
+  const site = selectedSite();
+  state.map.setView([site.lat,site.lon], 9, { animate:true });
+}
+
+function renderAll(){
+  refreshMarkerColors();
+  renderZoneInfo();
+  renderStatus();
+  renderCellStrip();
+  renderScoreAndExplain();
+  renderInfra();
+  renderHistorical();
+  renderEmergencyContacts();
+  updateAlertsAndNotifications();
+}
+
+function init(){
+  initMap();
+  populateSelectors();
+
+  document.getElementById('rainSlider').addEventListener('input',(e)=>{
+    state.rainfall = +e.target.value;
+    document.getElementById('rainVal').textContent = state.rainfall;
+    renderAll();
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    state.rainfall = 60;
+    document.getElementById('rainSlider').value = 60;
+    document.getElementById('rainVal').textContent = 60;
+    renderAll();
+  });
+  document.getElementById('btnSat').addEventListener('click', ()=>{
+    state.map.removeLayer(state.darkLayer); state.satLayer.addTo(state.map);
+    document.getElementById('btnSat').classList.add('active'); document.getElementById('btnDark').classList.remove('active');
+  });
+  document.getElementById('btnDark').addEventListener('click', ()=>{
+    state.map.removeLayer(state.satLayer); state.darkLayer.addTo(state.map);
+    document.getElementById('btnDark').classList.add('active'); document.getElementById('btnSat').classList.remove('active');
+  });
+  document.getElementById('findRouteBtn').addEventListener('click', runFindRoute);
+
+  renderAll();
+}
+
+if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
+
+})();
+</script>
+</body>
+</html>
